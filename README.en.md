@@ -61,13 +61,22 @@ in `game.js`.
 
 ## Getting Started
 
+Run this in the root of the cloned repository (the directory containing
+`package.json`):
+
 ```
 npm install
 ```
 
-After installation, open this directory in WeChat DevTools, then click
-"Tools" → "Build npm", followed by "Compile" (rebuild npm again whenever
+After installation, open that same repository root in WeChat DevTools, then
+click "Tools" → "Build npm", followed by "Compile" (rebuild npm again whenever
 dependencies change; not required for code-only changes).
+
+`project.config.json` has the AppID used for this spike's own verification
+hardcoded in it — anyone else opening the project most likely won't have
+permission for that AppID. If DevTools prompts a permission/login error, swap
+in your own AppID in the project settings, or open it without one (test
+account / tourist mode) — either way, local verification is unaffected.
 
 ## Key Files
 
