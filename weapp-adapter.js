@@ -69,6 +69,70 @@ safeAssign(g, 'localStorage', {
     removeItem: (k) => wx.removeStorageSync(k),
 });
 
+// XMLHttpRequest：Phaser 加载 JSON/文本类资源默认走 XHR（responseType:'text'），
+// 小游戏环境完全没有这个类。这里按 Phaser 的 XHRLoader 实际用到的方法/属性（open/
+// setRequestHeader/overrideMimeType/send/onload/onerror/status/readyState/response/
+// responseText）实现一个最小可用版本——本地相对路径走文件系统API读包内文件，
+// http(s)开头的远程URL走 wx.request。图片单独有 loader.imageLoadType:'HTMLImageElement'
+// 这个开关能完全绕开XHR（见 game.js），不需要这里额外支持 responseType:'blob'。
+function FakeXMLHttpRequest() {
+    this.readyState = 0;
+    this.status = 0;
+    this.response = null;
+    this.responseText = '';
+    this.responseType = '';
+    this.responseURL = '';
+    this.timeout = 0;
+    this.withCredentials = false;
+    this.onload = null;
+    this.onerror = null;
+    this.onprogress = null;
+    this.ontimeout = null;
+    this._url = '';
+}
+FakeXMLHttpRequest.prototype.open = function (method, url) {
+    this._url = url;
+    this.readyState = 1;
+};
+FakeXMLHttpRequest.prototype.setRequestHeader = function () {};
+FakeXMLHttpRequest.prototype.overrideMimeType = function () {};
+FakeXMLHttpRequest.prototype.send = function () {
+    const self = this;
+    const url = self._url;
+    const isRemote = /^(https?|wss?):\/\//.test(url);
+    const wantBinary = self.responseType === 'arraybuffer';
+
+    const finish = (ok, data) => {
+        self.readyState = 4;
+        self.status = ok ? 200 : 404;
+        self.responseURL = url;
+        self.response = data;
+        if (!wantBinary) self.responseText = typeof data === 'string' ? data : '';
+        const evt = { target: self, lengthComputable: false };
+        if (ok && typeof self.onload === 'function') self.onload(evt);
+        else if (!ok && typeof self.onerror === 'function') self.onerror(evt);
+    };
+
+    if (isRemote) {
+        wx.request({
+            url,
+            responseType: wantBinary ? 'arraybuffer' : 'text',
+            success: (res) => finish(res.statusCode >= 200 && res.statusCode < 300, res.data),
+            fail: () => finish(false, null),
+        });
+    } else {
+        const fs = wx.getFileSystemManager();
+        const readOpts = {
+            filePath: url,
+            success: (res) => finish(true, res.data),
+            fail: () => finish(false, null),
+        };
+        if (!wantBinary) readOpts.encoding = 'utf8';
+        fs.readFile(readOpts);
+    }
+};
+safeAssign(g, 'XMLHttpRequest', FakeXMLHttpRequest);
+
 // Image 全局构造器：Phaser加载图片资源时 new Image()，小游戏对应的是 wx.createImage()。
 safeAssign(g, 'Image', function () {
     return wx.createImage();

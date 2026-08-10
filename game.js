@@ -24,6 +24,11 @@ class SpikeScene extends Phaser.Scene {
         // wx.createImage()）-> 设置 src -> onload 上传纹理，这条路径Phaser全项目
         // 一百多张图都要走，跟"纯代码画矩形"完全不是一回事，必须单独验证。
         this.load.image('realTexture', 'images/test-texture.png');
+
+        // JSON配置文件加载：Phaser的hero.json/item.json这些都是走这条路——
+        // responseType:'text'，不碰Blob，走我们刚写的 XMLHttpRequest 垫层
+        // （本地相对路径用 wx.getFileSystemManager().readFile 读包内文件）。
+        this.load.json('testConfig', 'test-config.json');
     }
 
     create() {
@@ -46,8 +51,10 @@ class SpikeScene extends Phaser.Scene {
         g.destroy();
         this.bakedIcon = this.add.image(380, 140, 'bakedIcon').setDisplaySize(80, 80);
 
+        const jsonData = this.cache.json.get('testConfig');
+
         this.info = this.add.text(20, 20,
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\n真实贴图/烘焙纹理见右侧两张图`,
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\n真实贴图/烘焙纹理见右侧两张图\nJSON加载结果: ${jsonData ? jsonData.message + ' / ' + jsonData.sampleNumber : '(加载失败)'}`,
             { fontSize: '20px', color: '#eef0fa' });
 
         this.box.on('pointerdown', () => {
