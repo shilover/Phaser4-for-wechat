@@ -1,0 +1,13 @@
+{
+  "name": "wxapp-phaser-spike",
+  "version": "0.0.1",
+  "description": "微信小游戏环境下验证 Phaser 能否直接跑起来（先测 Phaser4，版本与 Phaser 主项目一致）",
+  "private": true,
+  "scripts": {
+    "postinstall": "node scripts/patch-phaser.js"
+  },
+  "dependencies": {
+    "phaser": "4.0.0",
+    "phaser3spectorjs": "^0.0.8"
+  }
+}
