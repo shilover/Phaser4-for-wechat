@@ -53,6 +53,6 @@
     "ignore": [],
     "include": []
   },
-  "isGameTourist": false,
+  "isGameTourist": true,
   "editorSetting": {}
 }
