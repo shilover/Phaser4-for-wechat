@@ -12,7 +12,8 @@ Phaser3。这个仓库就是这个验证过程的最小可复现例子。
 
 两种模式下都确认：渲染正常、触摸输入（点击变色/拖动跟随）正常、
 `wx.setStorageSync` 计数跨编译、跨切换渲染模式持久化正常、真实图片贴图加载正常、
-`Graphics.generateTexture` 烘焙纹理正常（`ProceduralIcons.ts` 重度依赖的技术）。
+`Graphics.generateTexture` 烘焙纹理正常（`ProceduralIcons.ts` 重度依赖的技术）、
+JSON配置文件加载正常（`this.load.json()`，Phaser的hero.json/item.json等都走这条路）。
 
 结论：Phaser 4.0.0（跟 Phaser 主项目 `design` 分支同版本）在微信小游戏环境里
 两种渲染模式都能跑，"要不要降级到 Phaser3" 这个前提被推翻——目前看不需要降级。
@@ -74,6 +75,13 @@ npm install
    会切换成完全不同的加载路径（`ImageFile.loadImage`），直接 `new Image()` + 设置
    `.src` + `.onload`，完全不碰XHR/Blob，跟我们适配层里 `Image` 的实现严丝合缝。
    **JSON/文本类资源大概率还是走XHR，这个坑目前只解决了图片这一类。**
+9. **JSON加载同样报 `XMLHttpRequest is not defined`，但这次没有类似 `imageLoadType`
+   的开关可以绕**——`JSONFile` 走的是 `responseType:'text'`，不涉及Blob，翻源码确认
+   `XHRLoader` 实际只用到 `open/setRequestHeader/overrideMimeType/send/onload/onerror/
+   status/readyState/response/responseText` 这几个方法和属性，照着写了一个最小可用的
+   `XMLHttpRequest` 类：本地相对路径（不带`http(s)://`）用
+   `wx.getFileSystemManager().readFile()` 读包内文件，远程URL用 `wx.request()`。
+   验证通过——Phaser 的配置文件加载这条路线也走得通。
 
 一路踩坑下来的经验：这个版本的小游戏运行时（`GameGlobal`）本身已经预置了不少
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"
