@@ -6,7 +6,6 @@
 需要先确认"Phaser 4 能否在小游戏运行时环境中直接运行"这一前提是否成立，而非预先
 假定必须降级至 Phaser 3。本仓库即为该验证过程的最小可复现示例。
 
-本验证基于一个手游项目开展。
 
 以下为该项目中小游戏接入的示例，已在微信开发者工具中验证可正常运行：
 https://github.com/shilover/CuteLandFarm/tree/phaser4-wechat-minigame
