@@ -4,6 +4,13 @@
 "Phaser4 能不能在小游戏运行时里直接跑起来"这个前提成不成立，不预设一定要降级到
 Phaser3。这个仓库就是这个验证过程的最小可复现例子。
 
+
+本验证本身基于一个大型手游项目进行，已剔除需保密部分内容
+
+这是一个小游戏接入的示例，已经在微信开发工具中正常跑通
+https://github.com/shilover/CuteLandFarm/tree/phaser4-wechat-minigame
+![alt text](images/Phaser4-wechat-minigame.png)
+
 ## 现状
 
 - **CANVAS 渲染模式：验证通过。**
@@ -103,3 +110,32 @@ npm install
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"
 的旧式weapp-adapter思路不一样——遇到报错先判断"是不是原来就有、只是不够用"，
 而不是上来就整体替换。
+
+## FAQ：为什么 `phaser3spectorjs`（带"3"）会出现在 Phaser4 项目里
+
+这是 Phaser 4.0.0 官方包自己的历史遗留依赖，原因分三层：
+
+1. **名字带"3"是历史遗留** —— 它是 `node_modules/phaser/package.json` 的
+   `devDependencies` 之一。这个 WebGL 调试工具库最早是 Phaser3 时代做的，Phaser
+   官方升级到 4.0 后继续沿用同一个包名，没有改名成 `phaser4spectorjs`。
+2. **为什么本项目自己的 `package.json` 也要显式声明它** —— 跟"踩过的坑"第3条同源：
+   Phaser4 `package.json` 用了新版 `exports` 字段，微信"构建npm"工具不认，会退回去
+   读 `main` 字段。没打 `patch-phaser.js` 那个补丁的话，`main` 指向未编译源码目录
+   `./src/phaser.js`，里面散落着真实的 `require('phaser3spectorjs')` 调用（WebGL
+   调试渲染器用的）。"构建npm"顺着这些 require 遍历依赖图，若 `phaser3spectorjs`
+   不在 `node_modules` 里会直接报错"找不到模块"。所以显式把它加进本项目
+   `dependencies`，保证不管构建流程有没有踩中这个坑，这个包都在。
+3. **但运行时其实用不到它** —— 真正被引用的是 `node_modules/phaser/dist/phaser.js`
+   （生产构建版，也就是 `patch-phaser.js` 把 `main` 改指向的那个文件），第
+   185967-185969 行可以看到：
+
+   ```js
+   if (false)
+   // removed by dead control flow
+   { var SPECTOR; }
+   ```
+
+   Phaser 官方打包 dist 时用了 `DEBUG=false` 开关，webpack 把这段
+   `require('phaser3spectorjs')` 当死代码删掉了。构建出来的 `miniprogram_npm` 下那份
+   `phaser3spectorjs` 文件夹，实际运行时从来不会被真正调用——它出现只是为了让
+   "构建npm"这一步顺利跑完，属于陪跑的无用依赖，不是坑，是历史包袱。
