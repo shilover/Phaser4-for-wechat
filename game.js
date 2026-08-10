@@ -4,9 +4,9 @@
  * 全部通过 Phaser 自己的 Graphics/Text/Input/Scene 生命周期完成——能跑通才说明引擎
  * 本身没问题，不是我们手写代码凑出来的假象。
  *
- * 用 CANVAS 渲染模式（不用 AUTO/WEBGL），把"WebGL要不要额外适配"这个变量隔离出去，
- * 已验证通过：渲染正常、触摸变色/跟随正常、wx.setStorageSync 计数跨编译持久化正常。
- * WebGL模式的验证见后续提交。
+ * CANVAS 和 WEBGL 两种渲染模式都已验证通过：渲染正常、触摸变色/跟随正常、
+ * wx.setStorageSync 计数跨编译持久化正常。当前文件是 WEBGL 版本，改 type 那行的
+ * Phaser.WEBGL/Phaser.CANVAS 即可切换。
  */
 require('./weapp-adapter');
 // node_modules/phaser/package.json 的 main 字段已经手动patch成 ./dist/phaser.js
@@ -26,7 +26,7 @@ class SpikeScene extends Phaser.Scene {
         this.box.setInteractive();
 
         this.info = this.add.text(20, 20,
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: CANVAS`,
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL`,
             { fontSize: '20px', color: '#eef0fa' });
 
         this.box.on('pointerdown', () => {
@@ -44,13 +44,13 @@ class SpikeScene extends Phaser.Scene {
 
     refreshInfo() {
         this.info.setText(
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: CANVAS`,
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL`,
         );
     }
 }
 
 new Phaser.Game({
-    type: Phaser.CANVAS,
+    type: Phaser.WEBGL,
     canvas: mainCanvas,
     width: mainCanvas.width,
     height: mainCanvas.height,

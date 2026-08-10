@@ -6,10 +6,16 @@ Phaser3。这个仓库就是这个验证过程的最小可复现例子。
 
 ## 现状
 
-- **CANVAS 渲染模式：验证通过。** 渲染、触摸输入（点击变色/拖动跟随）、
-  `wx.setStorageSync` 跨编译持久化，三项全部正常。
-- **WEBGL 渲染模式：验证中。**（Phaser 正式场景要用的是这个模式，CANVAS性能撑不住
+- **CANVAS 渲染模式：验证通过。**
+- **WEBGL 渲染模式：验证通过。**（Phaser 正式场景要用的是这个模式，CANVAS性能撑不住
   Tween/Graphics圆角面板/程序化图标这个量级）
+
+两种模式下都确认：渲染正常、触摸输入（点击变色/拖动跟随）正常、
+`wx.setStorageSync` 计数跨编译、跨切换渲染模式持久化正常。
+
+结论：Phaser 4.0.0（跟 Phaser 主项目 `design` 分支同版本）在微信小游戏环境里
+两种渲染模式都能跑，"要不要降级到 Phaser3" 这个前提被推翻——目前看不需要降级。
+`game.js` 里改 `type: Phaser.WEBGL`/`Phaser.CANVAS` 这一行即可切换验证哪个模式。
 
 ## 怎么跑
 
@@ -48,6 +54,15 @@ npm install
    顶替掉了。教训：这类"看起来该有"的全局对象，先检测存不存在，不要无脑覆盖。
 6. **`document.elementFromPoint` 没有** —— Phaser处理触摸移动要用它判断触摸点下是哪个
    元素，只有一块canvas，直接返回它自己。
+7. **（切到WEBGL模式后）`gl.bindVertexArray is not a function`** —— 根因不是运行时缺
+   能力，是我们自己的坑：之前把 `WebGLRenderingContext` 垫成了一个空函数（为了防止
+   `instanceof` 探测摸到undefined标识符报错），结果 Phaser 内部一段关键代码用
+   `gl instanceof WebGLRenderingContext` 判断要不要把 `bindVertexArray` 等WebGL2方法
+   从 `OES_vertex_array_object` 扩展里补到WebGL1的 `gl` 对象上——假构造器让这个判断
+   永远为false，反而把Phaser自己的WebGL1兼容补丁跳过了。Fix：探测一个真实的
+   `canvas.getContext('webgl')`，用它实际的构造器（`Object.getPrototypeOf(gl).constructor`）
+   而不是随手垫个空函数。**教训：给"类型标识符"占位时，只有用真实来源的构造器才安全，
+   假构造器可能悄悄改变 `instanceof` 的结果，反而引入新问题。**
 
 一路踩坑下来的经验：这个版本的小游戏运行时（`GameGlobal`）本身已经预置了不少
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"
