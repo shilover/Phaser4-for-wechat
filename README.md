@@ -17,7 +17,10 @@ JSON配置文件加载正常（`this.load.json()`，Phaser的hero.json/item.json
 **音频加载+解码+播放全部正常**（`this.load.audio()` + `this.sound.play()`，真实听到了
 点击音效）——这个环境原生自带真实的 `AudioContext`，Phaser自动选中了真正的
 `WebAudioSoundManager`，不是降级出来的空实现，是这次验证里最意外的好消息（历史上
-公认音频是小游戏适配最容易翻车的部分）。
+公认音频是小游戏适配最容易翻车的部分）、**Tween动画驱动Container、场景切换
+（`scene.start`）配合相机 `fadeOut`/`fadeIn`** 全部正常——后者是Phaser
+`SceneTransition.ts` 里 `goToScene` 辅助函数的核心技术，前者是全项目按钮悬停/
+面板弹出/结算数字滚动这些UI动效的基础。
 
 结论：Phaser 4.0.0（跟 Phaser 主项目 `design` 分支同版本）在微信小游戏环境里
 两种渲染模式都能跑，"要不要降级到 Phaser3" 这个前提被推翻——目前看不需要降级。
@@ -92,6 +95,9 @@ npm install
     更意外的是这个版本的小游戏运行时**原生自带真实的 `AudioContext`**
     （`typeof AudioContext === 'function'`），Phaser自动选中了真正的
     `WebAudioSoundManager` 去解码播放，不需要额外写任何音频兼容代码。
+11. **Tween/Container/多Scene切换/相机fadeOut+fadeIn——一个坑都没有**，前面几轮
+    踩坑把浏览器全局对象这层地基垫平之后，Phaser自己的对象模型（Tween/Container/
+    SceneManager/相机后处理）完全是按标准方式在工作，不需要额外适配。
 
 一路踩坑下来的经验：这个版本的小游戏运行时（`GameGlobal`）本身已经预置了不少
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"

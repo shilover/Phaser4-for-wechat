@@ -1,12 +1,11 @@
 /**
  * 验证：让 Phaser4（跟Phaser主项目同版本）在微信小游戏环境里真的跑起来。
- * 跟最初纯手写canvas那版画一样的东西（方块+文字+触摸变色/跟随+存储计数），但这次
- * 全部通过 Phaser 自己的 Graphics/Text/Input/Scene 生命周期完成——能跑通才说明引擎
- * 本身没问题，不是我们手写代码凑出来的假象。
+ * 已验证：CANVAS/WEBGL渲染、触摸、wx.setStorageSync持久化、真实图片贴图加载、
+ * Graphics.generateTexture烘焙纹理、JSON配置加载、音频加载解码播放。
  *
- * CANVAS 和 WEBGL 两种渲染模式都已验证通过：渲染正常、触摸变色/跟随正常、
- * wx.setStorageSync 计数跨编译持久化正常。当前文件是 WEBGL 版本，改 type 那行的
- * Phaser.WEBGL/Phaser.CANVAS 即可切换。
+ * 这一版新增：Tween动画（配合Container）、场景切换 + 相机淡入淡出——
+ * 后者是Phaser SceneTransition.ts里 goToScene 辅助函数的核心技术，
+ * 前者是Phaser全项目UI动效（按钮悬停/面板弹出/结算数字滚动）的基础。
  */
 require('./weapp-adapter');
 // node_modules/phaser/package.json 的 main 字段已经手动patch成 ./dist/phaser.js
@@ -14,29 +13,17 @@ require('./weapp-adapter');
 // 会退回去用 main，把一堆用不到的调试代码也带进来）。这里恢复成普通的包名require。
 const Phaser = require('phaser');
 
-console.log('[game.js] AudioContext存在:', typeof AudioContext, typeof GameGlobal.webkitAudioContext,
-    'game.sound最终类型见下方Game创建后');
-
 const STORAGE_KEY = 'tf_wxapp_spike_touch_count';
 const mainCanvas = GameGlobal.__WXAPP_MAIN_CANVAS__;
-const sys = GameGlobal.__WXAPP_SYSTEM_INFO__;
 
 class SpikeScene extends Phaser.Scene {
+    constructor() {
+        super('SpikeScene');
+    }
+
     preload() {
-        // 真实图片贴图加载：走 Phaser LoaderPlugin -> new Image()（我们适配层里指到
-        // wx.createImage()）-> 设置 src -> onload 上传纹理，这条路径Phaser全项目
-        // 一百多张图都要走，跟"纯代码画矩形"完全不是一回事，必须单独验证。
         this.load.image('realTexture', 'images/test-texture.png');
-
-        // JSON配置文件加载：Phaser的hero.json/item.json这些都是走这条路——
-        // responseType:'text'，不碰Blob，走我们刚写的 XMLHttpRequest 垫层
-        // （本地相对路径用 wx.getFileSystemManager().readFile 读包内文件）。
         this.load.json('testConfig', 'test-config.json');
-
-        // 音频加载：走 responseType:'arraybuffer'（要decodeAudioData解码），跟JSON同一套
-        // XMLHttpRequest垫层，本地文件走 wx.getFileSystemManager().readFile 不指定encoding
-        // 默认就是ArrayBuffer，理论上不用再额外加开关。这是最没底的一项，之前所有资料
-        // 都说音频最容易翻车，得真测一下点方块时能不能听到声音。
         this.load.audio('beep', 'audio/test-beep.wav');
     }
 
@@ -46,11 +33,11 @@ class SpikeScene extends Phaser.Scene {
         this.box = this.add.rectangle(140, 140, 80, 80, 0x4d6fd6);
         this.box.setInteractive();
 
-        // 真实贴图加载结果：预期在方块右边显示出这张小图
-        this.realImage = this.add.image(260, 140, 'realTexture').setDisplaySize(80, 80);
+        // Container + Tween：把两张图装进一个Container里，让Container整体上下浮动——
+        // Phaser的createPanel返回的就是Container，卡片hover上浮/结算面板弹出这些
+        // 动效全靠Tween驱动GameObject属性，这里验证同一条技术路径。
+        const realImage = this.add.image(0, 0, 'realTexture').setDisplaySize(80, 80);
 
-        // Graphics.generateTexture：ProceduralIcons.ts 重度依赖的技术——画一次，烘焙进
-        // 纹理缓存，之后当普通图片复用。这里画一个圆角矩形验证同样的技术路径。
         const g = this.add.graphics();
         g.fillStyle(0xd9a441, 1);
         g.fillRoundedRect(0, 0, 64, 64, 12);
@@ -58,13 +45,25 @@ class SpikeScene extends Phaser.Scene {
         g.strokeRoundedRect(0, 0, 64, 64, 12);
         g.generateTexture('bakedIcon', 64, 64);
         g.destroy();
-        this.bakedIcon = this.add.image(380, 140, 'bakedIcon').setDisplaySize(80, 80);
+        const bakedIcon = this.add.image(120, 0, 'bakedIcon').setDisplaySize(80, 80);
+
+        this.iconContainer = this.add.container(260, 140, [realImage, bakedIcon]);
+        this.tweens.add({
+            targets: this.iconContainer,
+            y: 160,
+            duration: 700,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+        });
 
         const jsonData = this.cache.json.get('testConfig');
 
         this.info = this.add.text(20, 20,
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\n真实贴图/烘焙纹理见右侧两张图\nJSON加载结果: ${jsonData ? jsonData.message + ' / ' + jsonData.sampleNumber : '(加载失败)'}`,
-            { fontSize: '20px', color: '#eef0fa' });
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\nJSON: ${jsonData ? jsonData.message : '(加载失败)'}\n右侧两图应持续上下浮动（Tween+Container）`,
+            { fontSize: '18px', color: '#eef0fa' });
+        this.info.setAlpha(0);
+        this.tweens.add({ targets: this.info, alpha: 1, duration: 500 });
 
         this.box.on('pointerdown', () => {
             this.touchCount++;
@@ -76,37 +75,64 @@ class SpikeScene extends Phaser.Scene {
 
         this.input.on('pointerdown', (pointer) => {
             if (this.box.getBounds().contains(pointer.x, pointer.y)) return;
+            if (this.switchBtn.getBounds().contains(pointer.x, pointer.y)) return;
             this.box.setPosition(pointer.x, pointer.y);
+        });
+
+        // 场景切换 + 相机淡出：跟 Phaser SceneTransition.ts 的 goToScene 完全同一套
+        // 手法——cam.fadeOut 播完之后监听 FADE_OUT_COMPLETE 事件再真正切场景。
+        this.switchBtn = this.add.rectangle(this.scale.width - 90, 40, 140, 50, 0x5a4a8a).setInteractive();
+        this.add.text(this.scale.width - 90, 40, '切换场景', { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
+        this.switchBtn.on('pointerdown', () => {
+            const cam = this.cameras.main;
+            cam.fadeOut(300, 0, 0, 0);
+            cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                this.scene.start('SecondScene');
+            });
         });
     }
 
     refreshInfo() {
         this.info.setText(
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL`,
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\n右侧两图应持续上下浮动（Tween+Container）`,
         );
     }
 }
 
-const game = new Phaser.Game({
+class SecondScene extends Phaser.Scene {
+    constructor() {
+        super('SecondScene');
+    }
+
+    create() {
+        this.cameras.main.fadeIn(300, 0, 0, 0);
+
+        this.add.text(this.scale.width / 2, this.scale.height / 2 - 40,
+            '这是第二个场景\n场景切换 + 相机淡入淡出验证通过',
+            { fontSize: '20px', color: '#8fe0a8', align: 'center' }).setOrigin(0.5);
+
+        const backBtn = this.add.rectangle(this.scale.width / 2, this.scale.height / 2 + 60, 140, 50, 0x3f9d5f).setInteractive();
+        this.add.text(this.scale.width / 2, this.scale.height / 2 + 60, '返回', { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
+        backBtn.on('pointerdown', () => {
+            const cam = this.cameras.main;
+            cam.fadeOut(300, 0, 0, 0);
+            cam.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+                this.scene.start('SpikeScene');
+            });
+        });
+    }
+}
+
+new Phaser.Game({
     type: Phaser.WEBGL,
     canvas: mainCanvas,
     width: mainCanvas.width,
     height: mainCanvas.height,
     backgroundColor: '#1c1e2a',
-    scene: SpikeScene,
+    scene: [SpikeScene, SecondScene],
     banner: false,
-    // 音频这块目前完全没验证过——先去掉 noAudio，看Phaser默认的音频管理器
-    // （WebAudioSoundManager/HTML5AudioSoundManager）初始化时炸不炸，这是音频这条路
-    // 能不能走通的第一道门槛（还没到"真的播放一个音效"那一步）。
     // 默认图片加载走 XHR + responseType:'blob'（createObjectURL），小游戏环境完全没有
-    // Blob——这正是我们最早查资料时"新版Phaser大量用Blob，weapp-adapter模拟不了"说的
-    // 那个坑。改成 HTMLImageElement 模式后，Phaser内部会直接 new Image() + 设置src，
-    // 完全不碰XHR/Blob，跟我们适配层里 Image 的实现严丝合缝。
+    // Blob。改成 HTMLImageElement 模式后，Phaser内部直接 new Image() + 设置src，
+    // 完全不碰XHR/Blob，跟适配层里 Image 的实现严丝合缝。
     loader: { imageLoadType: 'HTMLImageElement' },
 });
-
-setTimeout(() => {
-    if (!game.sound) return;
-    console.log('[game.js] SoundManager类型:', game.sound.constructor.name,
-        '是否noAudio:', game.sound.noAudio);
-}, 500);
