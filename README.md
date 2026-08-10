@@ -13,7 +13,11 @@ Phaser3。这个仓库就是这个验证过程的最小可复现例子。
 两种模式下都确认：渲染正常、触摸输入（点击变色/拖动跟随）正常、
 `wx.setStorageSync` 计数跨编译、跨切换渲染模式持久化正常、真实图片贴图加载正常、
 `Graphics.generateTexture` 烘焙纹理正常（`ProceduralIcons.ts` 重度依赖的技术）、
-JSON配置文件加载正常（`this.load.json()`，Phaser的hero.json/item.json等都走这条路）。
+JSON配置文件加载正常（`this.load.json()`，Phaser的hero.json/item.json等都走这条路）、
+**音频加载+解码+播放全部正常**（`this.load.audio()` + `this.sound.play()`，真实听到了
+点击音效）——这个环境原生自带真实的 `AudioContext`，Phaser自动选中了真正的
+`WebAudioSoundManager`，不是降级出来的空实现，是这次验证里最意外的好消息（历史上
+公认音频是小游戏适配最容易翻车的部分）。
 
 结论：Phaser 4.0.0（跟 Phaser 主项目 `design` 分支同版本）在微信小游戏环境里
 两种渲染模式都能跑，"要不要降级到 Phaser3" 这个前提被推翻——目前看不需要降级。
@@ -82,6 +86,12 @@ npm install
    `XMLHttpRequest` 类：本地相对路径（不带`http(s)://`）用
    `wx.getFileSystemManager().readFile()` 读包内文件，远程URL用 `wx.request()`。
    验证通过——Phaser 的配置文件加载这条路线也走得通。
+10. **音频反而没怎么踩坑**——`this.load.audio()` 走的是 `responseType:'arraybuffer'`，
+    复用JSON那套 `XMLHttpRequest` 垫层就直接能用（本地文件走
+    `wx.getFileSystemManager().readFile()` 不指定 `encoding`，默认就是ArrayBuffer）。
+    更意外的是这个版本的小游戏运行时**原生自带真实的 `AudioContext`**
+    （`typeof AudioContext === 'function'`），Phaser自动选中了真正的
+    `WebAudioSoundManager` 去解码播放，不需要额外写任何音频兼容代码。
 
 一路踩坑下来的经验：这个版本的小游戏运行时（`GameGlobal`）本身已经预置了不少
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"
