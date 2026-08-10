@@ -1,10 +1,12 @@
+中文 | [English](README.en.md)
+
 # Phaser4 in 微信小游戏 —— 最小可行性验证
 
 验证目的：Phaser 主项目基于 Phaser 4.0.0 开发。在决定是否引入微信小游戏平台之前，
 需要先确认"Phaser 4 能否在小游戏运行时环境中直接运行"这一前提是否成立，而非预先
 假定必须降级至 Phaser 3。本仓库即为该验证过程的最小可复现示例。
 
-本验证基于一个大型手游项目开展，已移除其中涉及保密的部分内容。
+本验证基于一个手游项目开展。
 
 以下为该项目中小游戏接入的示例，已在微信开发者工具中验证可正常运行：
 https://github.com/shilover/CuteLandFarm/tree/phaser4-wechat-minigame
