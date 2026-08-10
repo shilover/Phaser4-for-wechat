@@ -19,14 +19,35 @@ const mainCanvas = GameGlobal.__WXAPP_MAIN_CANVAS__;
 const sys = GameGlobal.__WXAPP_SYSTEM_INFO__;
 
 class SpikeScene extends Phaser.Scene {
+    preload() {
+        // 真实图片贴图加载：走 Phaser LoaderPlugin -> new Image()（我们适配层里指到
+        // wx.createImage()）-> 设置 src -> onload 上传纹理，这条路径Phaser全项目
+        // 一百多张图都要走，跟"纯代码画矩形"完全不是一回事，必须单独验证。
+        this.load.image('realTexture', 'images/test-texture.png');
+    }
+
     create() {
         this.touchCount = wx.getStorageSync(STORAGE_KEY) || 0;
 
         this.box = this.add.rectangle(140, 140, 80, 80, 0x4d6fd6);
         this.box.setInteractive();
 
+        // 真实贴图加载结果：预期在方块右边显示出这张小图
+        this.realImage = this.add.image(260, 140, 'realTexture').setDisplaySize(80, 80);
+
+        // Graphics.generateTexture：ProceduralIcons.ts 重度依赖的技术——画一次，烘焙进
+        // 纹理缓存，之后当普通图片复用。这里画一个圆角矩形验证同样的技术路径。
+        const g = this.add.graphics();
+        g.fillStyle(0xd9a441, 1);
+        g.fillRoundedRect(0, 0, 64, 64, 12);
+        g.lineStyle(3, 0x8a6a1e, 1);
+        g.strokeRoundedRect(0, 0, 64, 64, 12);
+        g.generateTexture('bakedIcon', 64, 64);
+        g.destroy();
+        this.bakedIcon = this.add.image(380, 140, 'bakedIcon').setDisplaySize(80, 80);
+
         this.info = this.add.text(20, 20,
-            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL`,
+            `canvas: ${mainCanvas.width}x${mainCanvas.height}\n点击方块次数（含历史累计）: ${this.touchCount}\nPhaser渲染模式: WEBGL\n真实贴图/烘焙纹理见右侧两张图`,
             { fontSize: '20px', color: '#eef0fa' });
 
         this.box.on('pointerdown', () => {
@@ -58,4 +79,9 @@ new Phaser.Game({
     scene: SpikeScene,
     banner: false,
     audio: { noAudio: true },
+    // 默认图片加载走 XHR + responseType:'blob'（createObjectURL），小游戏环境完全没有
+    // Blob——这正是我们最早查资料时"新版Phaser大量用Blob，weapp-adapter模拟不了"说的
+    // 那个坑。改成 HTMLImageElement 模式后，Phaser内部会直接 new Image() + 设置src，
+    // 完全不碰XHR/Blob，跟我们适配层里 Image 的实现严丝合缝。
+    loader: { imageLoadType: 'HTMLImageElement' },
 });
