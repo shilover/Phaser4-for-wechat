@@ -11,7 +11,8 @@ Phaser3。这个仓库就是这个验证过程的最小可复现例子。
   Tween/Graphics圆角面板/程序化图标这个量级）
 
 两种模式下都确认：渲染正常、触摸输入（点击变色/拖动跟随）正常、
-`wx.setStorageSync` 计数跨编译、跨切换渲染模式持久化正常。
+`wx.setStorageSync` 计数跨编译、跨切换渲染模式持久化正常、真实图片贴图加载正常、
+`Graphics.generateTexture` 烘焙纹理正常（`ProceduralIcons.ts` 重度依赖的技术）。
 
 结论：Phaser 4.0.0（跟 Phaser 主项目 `design` 分支同版本）在微信小游戏环境里
 两种渲染模式都能跑，"要不要降级到 Phaser3" 这个前提被推翻——目前看不需要降级。
@@ -63,6 +64,16 @@ npm install
    `canvas.getContext('webgl')`，用它实际的构造器（`Object.getPrototypeOf(gl).constructor`）
    而不是随手垫个空函数。**教训：给"类型标识符"占位时，只有用真实来源的构造器才安全，
    假构造器可能悄悄改变 `instanceof` 的结果，反而引入新问题。**
+
+8. **图片加载报 `XMLHttpRequest is not defined`** —— 翻了Phaser源码才发现，默认的
+   `ImageFile` 走的是 `XHR + responseType:'blob'`，加载完再用
+   `File.createObjectURL(img, xhr.response, 'image/png')` 把Blob转成`img.src`——
+   这正是我们最早查资料时"新版Phaser大量用Blob，weapp-adapter模拟不了"说的那个坑，
+   小游戏环境压根没有Blob/XHR。**没有硬写一个Blob兼容层去填这个坑**，而是翻源码发现
+   Phaser自己就留了个开关：Game配置里加 `loader: { imageLoadType: 'HTMLImageElement' }`，
+   会切换成完全不同的加载路径（`ImageFile.loadImage`），直接 `new Image()` + 设置
+   `.src` + `.onload`，完全不碰XHR/Blob，跟我们适配层里 `Image` 的实现严丝合缝。
+   **JSON/文本类资源大概率还是走XHR，这个坑目前只解决了图片这一类。**
 
 一路踩坑下来的经验：这个版本的小游戏运行时（`GameGlobal`）本身已经预置了不少
 "看起来像浏览器"的半成品全局对象（`window`/`document`等），跟"完全空白，什么都要自己垫"
