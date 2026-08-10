@@ -170,8 +170,29 @@ safeAssign(g, 'HTMLElement', function () {});
 safeAssign(g, 'HTMLCanvasElement', function () {});
 safeAssign(g, 'HTMLImageElement', g.Image);
 safeAssign(g, 'HTMLVideoElement', function () {});
-safeAssign(g, 'WebGLRenderingContext', function () {});
-safeAssign(g, 'WebGL2RenderingContext', function () {});
+// WebGLRenderingContext/WebGL2RenderingContext 不能随便垫个空函数了事——Phaser的WebGL
+// 渲染器里有一段关键的"WebGL1兼容补丁"逻辑，靠 `gl instanceof WebGLRenderingContext`
+// 判断要不要把 bindVertexArray 等方法从扩展里补到 gl 上，假构造器会让这个判断永远为false，
+// 反而把Phaser自己的兼容处理跳过了。这里用一个真实探测出来的canvas去拿真正的构造器。
+try {
+    const probeCanvas = wx.createCanvas();
+    const glCtx = probeCanvas.getContext('webgl');
+    if (glCtx) {
+        safeAssign(g, 'WebGLRenderingContext', Object.getPrototypeOf(glCtx).constructor);
+    } else {
+        safeAssign(g, 'WebGLRenderingContext', function () {});
+    }
+    const gl2Ctx = probeCanvas.getContext('webgl2');
+    if (gl2Ctx) {
+        safeAssign(g, 'WebGL2RenderingContext', Object.getPrototypeOf(gl2Ctx).constructor);
+    } else {
+        safeAssign(g, 'WebGL2RenderingContext', function () {});
+    }
+} catch (e) {
+    console.warn('[weapp-adapter] 探测WebGL上下文构造器失败: ' + e.message);
+    safeAssign(g, 'WebGLRenderingContext', function () {});
+    safeAssign(g, 'WebGL2RenderingContext', function () {});
+}
 safeAssign(g, 'screen', { width: systemInfo.windowWidth, height: systemInfo.windowHeight });
 
 // mainCanvas 本身就是 wx 提供的真实 canvas，Phaser Game 配置里会显式传进去用（见 game.js）。
