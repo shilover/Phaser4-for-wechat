@@ -14,6 +14,9 @@ require('./weapp-adapter');
 // 会退回去用 main，把一堆用不到的调试代码也带进来）。这里恢复成普通的包名require。
 const Phaser = require('phaser');
 
+console.log('[game.js] AudioContext存在:', typeof AudioContext, typeof GameGlobal.webkitAudioContext,
+    'game.sound最终类型见下方Game创建后');
+
 const STORAGE_KEY = 'tf_wxapp_spike_touch_count';
 const mainCanvas = GameGlobal.__WXAPP_MAIN_CANVAS__;
 const sys = GameGlobal.__WXAPP_SYSTEM_INFO__;
@@ -29,6 +32,12 @@ class SpikeScene extends Phaser.Scene {
         // responseType:'text'，不碰Blob，走我们刚写的 XMLHttpRequest 垫层
         // （本地相对路径用 wx.getFileSystemManager().readFile 读包内文件）。
         this.load.json('testConfig', 'test-config.json');
+
+        // 音频加载：走 responseType:'arraybuffer'（要decodeAudioData解码），跟JSON同一套
+        // XMLHttpRequest垫层，本地文件走 wx.getFileSystemManager().readFile 不指定encoding
+        // 默认就是ArrayBuffer，理论上不用再额外加开关。这是最没底的一项，之前所有资料
+        // 都说音频最容易翻车，得真测一下点方块时能不能听到声音。
+        this.load.audio('beep', 'audio/test-beep.wav');
     }
 
     create() {
@@ -62,6 +71,7 @@ class SpikeScene extends Phaser.Scene {
             wx.setStorageSync(STORAGE_KEY, this.touchCount);
             this.box.setFillStyle(this.box.fillColor === 0x4d6fd6 ? 0x3f9d5f : 0x4d6fd6);
             this.refreshInfo();
+            this.sound.play('beep');
         });
 
         this.input.on('pointerdown', (pointer) => {
@@ -77,7 +87,7 @@ class SpikeScene extends Phaser.Scene {
     }
 }
 
-new Phaser.Game({
+const game = new Phaser.Game({
     type: Phaser.WEBGL,
     canvas: mainCanvas,
     width: mainCanvas.width,
@@ -85,10 +95,18 @@ new Phaser.Game({
     backgroundColor: '#1c1e2a',
     scene: SpikeScene,
     banner: false,
-    audio: { noAudio: true },
+    // 音频这块目前完全没验证过——先去掉 noAudio，看Phaser默认的音频管理器
+    // （WebAudioSoundManager/HTML5AudioSoundManager）初始化时炸不炸，这是音频这条路
+    // 能不能走通的第一道门槛（还没到"真的播放一个音效"那一步）。
     // 默认图片加载走 XHR + responseType:'blob'（createObjectURL），小游戏环境完全没有
     // Blob——这正是我们最早查资料时"新版Phaser大量用Blob，weapp-adapter模拟不了"说的
     // 那个坑。改成 HTMLImageElement 模式后，Phaser内部会直接 new Image() + 设置src，
     // 完全不碰XHR/Blob，跟我们适配层里 Image 的实现严丝合缝。
     loader: { imageLoadType: 'HTMLImageElement' },
 });
+
+setTimeout(() => {
+    if (!game.sound) return;
+    console.log('[game.js] SoundManager类型:', game.sound.constructor.name,
+        '是否noAudio:', game.sound.noAudio);
+}, 500);
