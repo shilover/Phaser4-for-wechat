@@ -58,8 +58,7 @@ npm install
 安装完成后，使用微信开发者工具打开这个仓库根目录，依次点击"工具"→"构建 npm"，
 再执行"编译"（依赖变更后需重新构建 npm；仅修改代码则无需此步骤）。
 
-`project.config.json` 里 `appid` 用的是 `touristappid`（游客模式），任何人都能
-直接打开本地验证，不需要配置自己的 AppID。
+备注：目前`project.config.json` 里 `appid` 用的是 `touristappid`（游客模式），是我上传时修改的，验证基于我自己的 AppID。
 
 ## 关键文件
 
