@@ -47,6 +47,13 @@ Container、场景切换（`scene.start`）配合相机 `fadeOut`/`fadeIn`（后
 无需降级。如需切换验证的渲染模式，修改 `game.js` 中 `type: Phaser.WEBGL` /
 `Phaser.CANVAS` 一行即可。
 
+**补充验证（Phaser 4.2.1）：** 主项目计划把 Phaser 从 4.0.0 升到 4.2.1（为了装
+`@esotericsoftware/spine-phaser-v4`，它要求 `phaser@^4.1.0`）。按本仓库自己的前提
+（"版本与 Phaser 主项目一致"才算数），这里同步把 `package.json` 的 `phaser` 改成
+`4.2.1` 重新验证过，上面列的能力一览在 4.2.1 下同样全部验证通过。`scripts/patch-phaser.js`
+在 4.2.1 下依然需要（`main` 字段还是没有指向 `./dist/phaser.js`，不是"以后升级了
+可能就不需要"命中的那种情况）。主项目实际升级到 4.2.1 前，这一节是当前生效的验证结论。
+
 ## 运行方式
 
 在克隆下来的仓库根目录（`package.json` 所在的这一层）执行：
